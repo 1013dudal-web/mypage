@@ -14,28 +14,35 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700&display=swap');
-        body { font-family: 'Pretendard', sans-serif; scroll-behavior: smooth; }
-        
-        /* 부드러운 나타나기 애니메이션 */
-        .fade-in-up {
-            animation: fadeInUp 0.6s ease-out forwards;
+        body { 
+            font-family: 'Pretendard', sans-serif; 
+            scroll-behavior: smooth; 
+            overflow-x: hidden;
         }
         
-        @keyframes fadeInUp {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
+        .transition-all-custom {
+            transition: all 0.6s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        /* 텍스트 교체 시 부드러운 효과 */
-        .text-transition {
-            transition: all 0.5s ease-in-out;
+        /* 텍스트 페이드 효과 */
+        .text-fade {
+            transition: opacity 0.4s ease, transform 0.4s ease;
         }
 
-        /* 로딩 중 블러 효과 */
-        .blur-sm { filter: blur(4px); }
+        /* 배경 그라데이션 애니메이션 */
+        .bg-animate {
+            background-size: 200% 200%;
+            animation: gradientMove 10s ease infinite;
+        }
+
+        @keyframes gradientMove {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
     </style>
 </head>
-<body class="bg-gradient-to-br from-indigo-50 via-white to-rose-50 text-slate-800">
+<body class="bg-gradient-to-br from-indigo-50 via-white to-rose-50 bg-animate text-slate-800">
     <div id="root"></div>
 
     <script type="text/babel">
@@ -49,31 +56,27 @@
             const [hasStarted, setHasStarted] = useState(false);
             const resultRef = useRef(null);
 
-            const apiKey = ""; // Canvas 환경에서는 자동으로 채워집나다.
+            const apiKey = ""; // Canvas 환경 제공
             const modelName = "gemini-2.5-flash-preview-09-2025";
 
-            const initIcons = () => {
+            // 아이콘 초기화
+            useEffect(() => {
                 if (window.lucide) {
                     window.lucide.createIcons();
                 }
-            };
-
-            // 결과값이 업데이트되거나 로딩 상태가 바뀔 때 아이콘 다시 그리기
-            useEffect(() => {
-                initIcons();
-            }, [output, isLoading, history, hasStarted]);
+            }, [output, isLoading, hasStarted, history]);
 
             const systemPrompt = `
                 당신은 따뜻하고 공감 능력이 뛰어난 '수학 성장 마인드셋 코치'입니다.
                 사용자가 수학에 대해 느끼는 부정적인 생각(고정 마인드셋)을 입력하면, 이를 긍정적이고 희망적인 '성장 마인드셋'으로 바꾸어 설명해 주세요.
-                답변 원칙: 1. 공감 먼저, 2. 수학은 근육처럼 자란다는 점 강조, 3. 구체적인 격려, 4. 부드러운 존댓말.
+                답변 원칙: 1. 공감 먼저, 2. 수학은 근육처럼 자란다는 점 강조, 3. 실천 가능한 격려, 4. 부드러운 존댓말.
             `;
 
             const transformMindset = async () => {
                 if (!input.trim() || isLoading) return;
                 
                 setIsLoading(true);
-                setHasStarted(true); // 결과창 영역을 고정시킴
+                setHasStarted(true); // 영역 표시 유지
                 
                 try {
                     const response = await fetch(
@@ -88,7 +91,7 @@
                         }
                     );
 
-                    if (!response.ok) throw new Error('API_CALL_FAILED');
+                    if (!response.ok) throw new Error('API_FAILED');
 
                     const data = await response.json();
                     const resultText = data.candidates?.[0]?.content?.parts?.[0]?.text;
@@ -98,16 +101,16 @@
                         setHistory(prev => [{ negative: input, positive: resultText }, ...prev.slice(0, 4)]);
                         setInput('');
                         
-                        // 결과가 나오면 화면을 아래로 부드럽게 스크롤
+                        // 결과가 나오면 부드럽게 스크롤
                         setTimeout(() => {
-                            resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                            resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
                         }, 100);
                     }
                 } catch (error) {
                     if (apiKey === "") {
-                        setOutput("현재 API 키가 설정되지 않아 답변을 생성할 수 없어요. (Canvas의 '미리보기'에서는 정상 작동합니다!)");
+                        setOutput("현재 환경에서는 답변을 생성할 수 없어요. (Canvas 미리보기에서는 작동합니다!)");
                     } else {
-                        setOutput("잠시 연결이 원활하지 않아요. 다시 시도해 볼까요?");
+                        setOutput("잠시 마음을 가다듬고 다시 시도해 볼까요?");
                     }
                 } finally {
                     setIsLoading(false);
@@ -115,25 +118,28 @@
             };
 
             return (
-                <div className="min-h-screen flex flex-col items-center p-4 md:p-8">
-                    <header className="max-w-2xl w-full text-center mb-12 fade-in-up">
-                        <div className="inline-flex items-center justify-center p-3 bg-white rounded-2xl shadow-sm mb-4">
-                            <i data-lucide="brain-circuit" className="w-8 h-8 text-indigo-500 mr-2"></i>
-                            <h1 className="text-2xl md:text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-rose-500">
+                <div className="min-h-screen flex flex-col items-center p-6 md:p-12">
+                    <header className="max-w-2xl w-full text-center mb-16 opacity-0 animate-fade-in" style={{animation: 'fadeIn 1s forwards'}}>
+                        <div className="inline-flex items-center justify-center p-4 bg-white rounded-3xl shadow-sm mb-6 border border-white">
+                            <i data-lucide="brain-circuit" className="w-10 h-10 text-indigo-500 mr-3"></i>
+                            <h1 className="text-3xl md:text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-rose-500">
                                 수학 마인드셋 도우미
                             </h1>
                         </div>
-                        <p className="text-slate-500 text-lg">여러분은 지금, 잘 해내고있어요.</p>
+                        <p className="text-slate-400 text-xl font-medium">여러분은 지금, 잘 해내고있어요.</p>
                     </header>
 
-                    <main className="max-w-2xl w-full space-y-8">
-                        {/* 입력 영역 */}
-                        <section className="bg-white/80 backdrop-blur-md p-6 rounded-3xl shadow-xl border border-white fade-in-up">
-                            <label className="block text-sm font-semibold text-slate-400 mb-3 ml-1">지금 마음속의 수학에 대한 부담감을 적어주세요</label>
+                    <main className="max-w-2xl w-full space-y-10">
+                        {/* 입력 카드 */}
+                        <section className="bg-white/70 backdrop-blur-xl p-8 rounded-[40px] shadow-2xl shadow-indigo-100/50 border border-white">
+                            <div className="flex items-center mb-4 ml-1">
+                                <i data-lucide="message-circle" className="w-5 h-5 text-indigo-400 mr-2"></i>
+                                <label className="text-sm font-bold text-slate-400 uppercase tracking-widest">오늘의 걱정 나누기</label>
+                            </div>
                             <div className="relative">
                                 <textarea
-                                    className="w-full h-32 p-4 bg-slate-50/50 border border-slate-100 rounded-2xl focus:ring-2 focus:ring-indigo-300 outline-none transition-all resize-none text-lg"
-                                    placeholder="예: 아무리 풀어도 모르겠어요..."
+                                    className="w-full h-40 p-6 bg-slate-50/50 border-2 border-transparent focus:border-indigo-100 rounded-[30px] outline-none transition-all resize-none text-xl leading-relaxed"
+                                    placeholder="예: 저는 수학적 재능이 없는 것 같아요..."
                                     value={input}
                                     onChange={(e) => setInput(e.target.value)}
                                     onKeyDown={(e) => {
@@ -146,65 +152,78 @@
                                 <button
                                     onClick={transformMindset}
                                     disabled={isLoading || !input.trim()}
-                                    className="absolute bottom-3 right-3 p-3 rounded-xl bg-indigo-500 text-white disabled:bg-slate-200 transition-all hover:scale-110 active:scale-95 shadow-lg shadow-indigo-200"
+                                    className={`absolute bottom-4 right-4 p-4 rounded-2xl transition-all duration-300 ${
+                                        isLoading || !input.trim() 
+                                        ? 'bg-slate-200 text-slate-400' 
+                                        : 'bg-indigo-500 text-white shadow-xl shadow-indigo-200 hover:scale-105 active:scale-95'
+                                    }`}
                                 >
-                                    {isLoading ? <i data-lucide="refresh-cw" className="w-5 h-5 animate-spin"></i> : <i data-lucide="send" className="w-5 h-5"></i>}
+                                    {isLoading ? <i data-lucide="refresh-cw" className="w-6 h-6 animate-spin"></i> : <i data-lucide="sparkles" className="w-6 h-6"></i>}
                                 </button>
                             </div>
                         </section>
 
-                        {/* 결과 영역: 한 번이라도 시작했다면 고정 표시 */}
-                        {hasStarted && (
-                            <section ref={resultRef} className="fade-in-up">
-                                <div className="bg-gradient-to-r from-indigo-500 to-purple-500 p-px rounded-3xl shadow-2xl overflow-hidden">
-                                    <div className="bg-white p-8 rounded-[23px] relative min-h-[160px] flex flex-col justify-center">
-                                        
-                                        <div className="flex items-center mb-4">
-                                            <i data-lucide="heart" className="w-5 h-5 text-rose-500 mr-2 fill-rose-500"></i>
-                                            <h2 className="text-xl font-bold text-slate-800">성장 마인드셋의 목소리</h2>
+                        {/* 결과 카드: 항상 렌더링하되 스타일로 조절 */}
+                        <section 
+                            ref={resultRef}
+                            className={`transition-all-custom transform ${
+                                hasStarted ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-10 scale-95 pointer-events-none'
+                            }`}
+                        >
+                            <div className="bg-gradient-to-br from-indigo-500 via-purple-500 to-rose-500 p-[2px] rounded-[40px] shadow-2xl">
+                                <div className="bg-white p-10 rounded-[38px] relative overflow-hidden min-h-[220px] flex flex-col justify-center">
+                                    
+                                    <div className="flex items-center mb-6">
+                                        <div className="p-3 bg-rose-50 rounded-2xl mr-4">
+                                            <i data-lucide="heart" className="w-6 h-6 text-rose-500 fill-rose-500"></i>
                                         </div>
+                                        <h2 className="text-2xl font-bold text-slate-800 tracking-tight">따뜻한 마음의 한마디</h2>
+                                    </div>
 
-                                        <div className="relative">
-                                            {isLoading && (
-                                                <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/40 backdrop-blur-[1px] z-10 transition-opacity duration-300">
-                                                    <div className="flex items-center space-x-2 text-indigo-500 font-bold bg-white/80 px-4 py-2 rounded-full shadow-sm">
-                                                        <i data-lucide="sparkles" className="w-5 h-5 animate-bounce"></i>
-                                                        <span>따뜻한 답변을 생각하고 있어요...</span>
-                                                    </div>
+                                    <div className="relative">
+                                        {isLoading && (
+                                            <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60 backdrop-blur-sm z-20 animate-in fade-in duration-300">
+                                                <div className="flex items-center space-x-3 text-indigo-600 font-bold bg-white px-6 py-3 rounded-full shadow-lg border border-indigo-50">
+                                                    <div className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce"></div>
+                                                    <div className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce [animation-delay:-.15s]"></div>
+                                                    <div className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce [animation-delay:-.3s]"></div>
+                                                    <span className="ml-2">생각을 정리하고 있어요...</span>
                                                 </div>
-                                            )}
-
-                                            <div className={`text-slate-700 leading-relaxed text-lg italic whitespace-pre-wrap text-center text-transition ${isLoading ? 'opacity-30 blur-sm scale-95' : 'opacity-100 scale-100'}`}>
-                                                {output ? `"${output}"` : "답변을 준비하고 있어요..."}
                                             </div>
+                                        )}
+
+                                        <div className={`text-slate-700 leading-relaxed text-xl italic whitespace-pre-wrap text-center text-fade ${isLoading ? 'opacity-20 scale-95 blur-[2px]' : 'opacity-100 scale-100'}`}>
+                                            {output ? `"${output}"` : "여러분의 진심을 기다리고 있어요."}
                                         </div>
                                     </div>
                                 </div>
-                            </section>
-                        )}
-
-                        {/* 과거 기록 */}
-                        {history.length > 0 && (
-                            <div className="space-y-4 pt-4 fade-in-up">
-                                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">나의 마음 기록</h3>
-                                {history.map((item, index) => (
-                                    <div key={index} className="bg-white/40 p-4 rounded-2xl border border-white/50 text-sm hover:bg-white/60 transition-colors">
-                                        <div className="flex items-start opacity-50 mb-1">
-                                            <i data-lucide="message-circle" className="w-4 h-4 mr-2"></i>
-                                            <p className="line-clamp-1">{item.negative}</p>
-                                        </div>
-                                        <div className="flex items-start text-indigo-600 font-medium">
-                                            <i data-lucide="sparkles" className="w-4 h-4 mr-2"></i>
-                                            <p className="line-clamp-2">{item.positive}</p>
-                                        </div>
-                                    </div>
-                                ))}
                             </div>
-                        )}
+                        </section>
+
+                        {/* 역사 기록 */}
+                        <div className={`space-y-6 pt-4 transition-all duration-1000 ${history.length > 0 ? 'opacity-100' : 'opacity-0'}`}>
+                            <div className="flex items-center ml-2">
+                                <div className="h-px bg-slate-200 flex-grow mr-4"></div>
+                                <h3 className="text-xs font-black text-slate-300 uppercase tracking-[0.3em]">나의 변화 기록</h3>
+                                <div className="h-px bg-slate-200 flex-grow ml-4"></div>
+                            </div>
+                            {history.map((item, index) => (
+                                <div key={index} className="bg-white/40 backdrop-blur-sm p-6 rounded-3xl border border-white/50 hover:bg-white/60 transition-all group shadow-sm">
+                                    <div className="flex items-start opacity-40 mb-3 group-hover:opacity-60 transition-opacity">
+                                        <i data-lucide="quote" className="w-4 h-4 mr-3 rotate-180"></i>
+                                        <p className="text-sm italic">{item.negative}</p>
+                                    </div>
+                                    <div className="flex items-start text-indigo-600 font-semibold leading-relaxed">
+                                        <i data-lucide="sparkles" className="w-5 h-5 mr-3 mt-1 text-amber-400"></i>
+                                        <p>{item.positive}</p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     </main>
 
-                    <footer className="mt-auto py-10 opacity-40 text-xs text-center">
-                        <p>© 수학 마인드셋 도우미 | 당신의 가능성은 무한합니다.</p>
+                    <footer className="mt-24 py-10 opacity-30 text-xs tracking-widest text-center">
+                        <p>© 2024 수학 마인드셋 도우미 | 당신은 이미 충분히 빛나고 있습니다.</p>
                     </footer>
                 </div>
             );
@@ -212,6 +231,16 @@
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<App />);
+
+        // Global styles
+        const style = document.createElement('style');
+        style.innerHTML = `
+            @keyframes fadeIn {
+                from { opacity: 0; transform: translateY(-10px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+        `;
+        document.head.appendChild(style);
     </script>
 </body>
 </html>
