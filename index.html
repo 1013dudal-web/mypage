@@ -14,36 +14,42 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700&display=swap');
-        body { font-family: 'Pretendard', sans-serif; }
-        @keyframes fade-in {
-            from { opacity: 0; transform: translateY(-10px); }
+        body { font-family: 'Pretendard', sans-serif; scroll-behavior: smooth; }
+        
+        /* 부드러운 나타나기 애니메이션 */
+        .fade-in-up {
+            animation: fadeInUp 0.6s ease-out forwards;
+        }
+        
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
             to { opacity: 1; transform: translateY(0); }
         }
-        .animate-fade-in { animation: fade-in 1s ease-out forwards; }
-        .loading-shimmer {
-            background: linear-gradient(90deg, #f0f0f0 25%, #f8f8f8 50%, #f0f0f0 75%);
-            background-size: 200% 100%;
-            animation: shimmer 1.5s infinite;
+
+        /* 텍스트 교체 시 부드러운 효과 */
+        .text-transition {
+            transition: all 0.5s ease-in-out;
         }
-        @keyframes shimmer {
-            0% { background-position: 200% 0; }
-            100% { background-position: -200% 0; }
-        }
+
+        /* 로딩 중 블러 효과 */
+        .blur-sm { filter: blur(4px); }
     </style>
 </head>
 <body class="bg-gradient-to-br from-indigo-50 via-white to-rose-50 text-slate-800">
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useEffect } = React;
+        const { useState, useEffect, useRef } = React;
 
         const App = () => {
             const [input, setInput] = useState('');
             const [output, setOutput] = useState('');
             const [isLoading, setIsLoading] = useState(false);
             const [history, setHistory] = useState([]);
+            const [hasStarted, setHasStarted] = useState(false);
+            const resultRef = useRef(null);
 
-            const apiKey = ""; // Canvas 환경에서는 자동으로 채워지나, 외부(GitHub)에서는 키가 필요합니다.
+            const apiKey = ""; // Canvas 환경에서는 자동으로 채워집나다.
             const modelName = "gemini-2.5-flash-preview-09-2025";
 
             const initIcons = () => {
@@ -52,9 +58,10 @@
                 }
             };
 
+            // 결과값이 업데이트되거나 로딩 상태가 바뀔 때 아이콘 다시 그리기
             useEffect(() => {
                 initIcons();
-            }, [output, isLoading, history]);
+            }, [output, isLoading, history, hasStarted]);
 
             const systemPrompt = `
                 당신은 따뜻하고 공감 능력이 뛰어난 '수학 성장 마인드셋 코치'입니다.
@@ -64,8 +71,9 @@
 
             const transformMindset = async () => {
                 if (!input.trim() || isLoading) return;
+                
                 setIsLoading(true);
-                // setOutput('')를 제거하여 이전 결과가 깜빡이며 사라지는 것을 방지합니다.
+                setHasStarted(true); // 결과창 영역을 고정시킴
                 
                 try {
                     const response = await fetch(
@@ -89,6 +97,11 @@
                         setOutput(resultText);
                         setHistory(prev => [{ negative: input, positive: resultText }, ...prev.slice(0, 4)]);
                         setInput('');
+                        
+                        // 결과가 나오면 화면을 아래로 부드럽게 스크롤
+                        setTimeout(() => {
+                            resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }, 100);
                     }
                 } catch (error) {
                     if (apiKey === "") {
@@ -103,7 +116,7 @@
 
             return (
                 <div className="min-h-screen flex flex-col items-center p-4 md:p-8">
-                    <header className="max-w-2xl w-full text-center mb-12 animate-fade-in">
+                    <header className="max-w-2xl w-full text-center mb-12 fade-in-up">
                         <div className="inline-flex items-center justify-center p-3 bg-white rounded-2xl shadow-sm mb-4">
                             <i data-lucide="brain-circuit" className="w-8 h-8 text-indigo-500 mr-2"></i>
                             <h1 className="text-2xl md:text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-indigo-600 to-rose-500">
@@ -114,7 +127,8 @@
                     </header>
 
                     <main className="max-w-2xl w-full space-y-8">
-                        <section className="bg-white/80 backdrop-blur-md p-6 rounded-3xl shadow-xl border border-white">
+                        {/* 입력 영역 */}
+                        <section className="bg-white/80 backdrop-blur-md p-6 rounded-3xl shadow-xl border border-white fade-in-up">
                             <label className="block text-sm font-semibold text-slate-400 mb-3 ml-1">지금 마음속의 수학에 대한 부담감을 적어주세요</label>
                             <div className="relative">
                                 <textarea
@@ -132,45 +146,49 @@
                                 <button
                                     onClick={transformMindset}
                                     disabled={isLoading || !input.trim()}
-                                    className="absolute bottom-3 right-3 p-3 rounded-xl bg-indigo-500 text-white disabled:bg-slate-200 transition-all hover:scale-105 active:scale-95 shadow-lg shadow-indigo-200"
+                                    className="absolute bottom-3 right-3 p-3 rounded-xl bg-indigo-500 text-white disabled:bg-slate-200 transition-all hover:scale-110 active:scale-95 shadow-lg shadow-indigo-200"
                                 >
                                     {isLoading ? <i data-lucide="refresh-cw" className="w-5 h-5 animate-spin"></i> : <i data-lucide="send" className="w-5 h-5"></i>}
                                 </button>
                             </div>
                         </section>
 
-                        {(output || isLoading) && (
-                            <section className="animate-in fade-in slide-in-from-bottom-4 duration-700">
+                        {/* 결과 영역: 한 번이라도 시작했다면 고정 표시 */}
+                        {hasStarted && (
+                            <section ref={resultRef} className="fade-in-up">
                                 <div className="bg-gradient-to-r from-indigo-500 to-purple-500 p-px rounded-3xl shadow-2xl overflow-hidden">
-                                    <div className="bg-white p-8 rounded-[23px] relative min-h-[120px]">
+                                    <div className="bg-white p-8 rounded-[23px] relative min-h-[160px] flex flex-col justify-center">
+                                        
                                         <div className="flex items-center mb-4">
                                             <i data-lucide="heart" className="w-5 h-5 text-rose-500 mr-2 fill-rose-500"></i>
                                             <h2 className="text-xl font-bold text-slate-800">성장 마인드셋의 목소리</h2>
                                         </div>
 
-                                        {/* 로딩 오버레이: 이전 텍스트를 가리지 않고 부드럽게 표시 */}
-                                        {isLoading && (
-                                            <div className="absolute inset-0 bg-white/60 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center animate-in fade-in duration-300">
-                                                <div className="flex items-center space-x-2 text-indigo-500 font-semibold">
-                                                    <i data-lucide="sparkles" className="w-5 h-5 animate-bounce"></i>
-                                                    <span>따뜻한 답변을 생각하고 있어요...</span>
+                                        <div className="relative">
+                                            {isLoading && (
+                                                <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/40 backdrop-blur-[1px] z-10 transition-opacity duration-300">
+                                                    <div className="flex items-center space-x-2 text-indigo-500 font-bold bg-white/80 px-4 py-2 rounded-full shadow-sm">
+                                                        <i data-lucide="sparkles" className="w-5 h-5 animate-bounce"></i>
+                                                        <span>따뜻한 답변을 생각하고 있어요...</span>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        )}
+                                            )}
 
-                                        <div className={`text-slate-700 leading-relaxed text-lg italic whitespace-pre-wrap text-center transition-all duration-500 ${isLoading ? 'blur-[1px] opacity-40 scale-95' : 'opacity-100 scale-100'}`}>
-                                            "{output || "여러분의 고민을 나누어주세요."}"
+                                            <div className={`text-slate-700 leading-relaxed text-lg italic whitespace-pre-wrap text-center text-transition ${isLoading ? 'opacity-30 blur-sm scale-95' : 'opacity-100 scale-100'}`}>
+                                                {output ? `"${output}"` : "답변을 준비하고 있어요..."}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
                             </section>
                         )}
 
+                        {/* 과거 기록 */}
                         {history.length > 0 && (
-                            <div className="space-y-4 pt-4">
+                            <div className="space-y-4 pt-4 fade-in-up">
                                 <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest ml-1">나의 마음 기록</h3>
                                 {history.map((item, index) => (
-                                    <div key={index} className="bg-white/40 p-4 rounded-2xl border border-white/50 text-sm animate-fade-in">
+                                    <div key={index} className="bg-white/40 p-4 rounded-2xl border border-white/50 text-sm hover:bg-white/60 transition-colors">
                                         <div className="flex items-start opacity-50 mb-1">
                                             <i data-lucide="message-circle" className="w-4 h-4 mr-2"></i>
                                             <p className="line-clamp-1">{item.negative}</p>
